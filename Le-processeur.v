@@ -18,6 +18,44 @@ module processador (DIN, Resetn, Clock, Run, Done, BusWires);
 	reg Ain;
 	reg Gout;
 	reg Gin;
+	reg [0:15] InstructionMemory [15:0];
+	reg [0:15] RegisterBank [7:0];
+	reg [0:15] DataMemory[7:0];
+	reg [3:0]pc;
+	reg [15:0]instruction;
+	reg [3:0] instructionIndex;
+	reg [2:0] registerA;
+	reg [2:0] registerB;
+	reg [5:0] imediate;
+	reg [15:0] tmpreg;
+	reg [15:0] Gtmp;
+	reg [8:0] imd;
+
+	initial begin
+		
+		InstructionMemory[0] = 16'b0000001000000001;
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		InstructionMemory[i] =
+		pc = 0; 
+
+		for(i=0;i<8;i=i+1) begin
+			RegisterBank[i] = i;
+		end
+		
+	end
 
 	wire Clear = Done | ~Resetn | ~Run ;
 	contador estagio(Clear, Clock,estagio_atual);
@@ -25,70 +63,78 @@ module processador (DIN, Resetn, Clock, Run, Done, BusWires);
 	dec3to8 decX (IR[4:6], 1'b1, registradorX);
 	dec3to8 decY (IR[7:9], 1'b1, registradorY);
 	
-	always @(estagio_atual or I or registrador1 or registrador2) begin
+	always @(/*estagio_atual or I or registrador1 or registrador2*/Clock or Done) begin
 			//... specify initial values
+
+			if(Done) begin
+				pc = pc + 1'b0;
+			end
+
 			case (estagio_atual)
 				2'b00: // busca instrução na memória
 				begin
-					IRin = 1'b1;
+					//IRin = 1'b1;
+					instruction = InstructionMemory[pc];
+					instructionIndex = instruction[0:3];
+					registerA = instruction[4:6];
+					registerB = instruction[7:9];
+					imediate = instruction[10:15];
 				end
 				2'b01: //define signals in time step 1
 				case (I)
 					4'b0000: //mv
 					begin
+						RegisterBank[registerA] = RegisterBank[registerB];
 						Done = 1'b1;
-						Rout = registradorY;
-						Rin = registradorX;
 					end
 					
 					4'b0001: //mvi
 					begin
+						RegisterBank[registerA] = {registerB,imediate};
 						Done = 1'b1;
-						DINout = 1'b1;
-						Rin = registradorX;
 					end
 					
 					4'b0010: //add
 					begin
-						Done = 1'b0;
-
+						tmpreg = RegisterBank[registerA];
 					end
-					4'b0100: //mv
+
+					4'b0100: // sub 
+					begin
+						tmpreg = RegisterBank[registerA];
+					end
+
+					4'b0101: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0101: //mv
+					4'b0110: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0110: //mv
+					4'b0111: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0111: //mv
+					4'b0000: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0000: //mv
+					4'b0000: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0000: //mv
+					4'b0000: 
 					begin
 						Done = 1'b0;
 
 					end
-					4'b0000: //mv
-					begin
-						Done = 1'b0;
-
-					end
-					4'b0000: //mv
+					4'b0000: 
 					begin
 						Done = 1'b0;
 
@@ -96,12 +142,32 @@ module processador (DIN, Resetn, Clock, Run, Done, BusWires);
 				endcase
 				2'b10: //define signals in time step 2
 				case (I)
-					
+					4'b0010:
+					begin
+						Gtmp = tmpreg + RegisterBank[registerB];
+					end
+
+					4'b0100:
+					begin
+						Gtmp = tmpreg - RegisterBank[registerB];
+					end
+
 				
 				endcase
 				2'b11: //define signals in time step 3
 				case (I)
-				
+					4'b0010:
+					begin
+						RegisterBank[registerA] = Gtmp;
+						Done = 1'b1;
+					end
+
+					4'b0100:
+					begin
+						RegisterBank[registerA] = Gtmp;
+						Done = 1'b1;
+					end
+
 				endcase
 			endcase
 	end
