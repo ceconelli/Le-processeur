@@ -1,7 +1,7 @@
-module processor(DIN, Resetn, Clock, Run, Done);
+module proc(DIN, Reset, Clock, Run, Done,out);
 	input [15:0] DIN; //dado de entrada
-	input Resetn, Clock, Run;
-	output Done; //sinal que informa se a instruçao ja terminou
+	input Reset, Clock, Run;
+	output reg Done; //sinal que informa se a instruçao ja terminou
 	
 	reg [15:0] InstructionMemory [15:0]; //Memória de instruções
 	reg [15:0] RegisterBank [7:0]; // Banco de registradores
@@ -16,29 +16,30 @@ module processor(DIN, Resetn, Clock, Run, Done);
 	reg [15:0] tmpreg;
 	reg [15:0] Gtmp;
 	reg [15:0] memory_data;
-
+	integer i;
 	output reg [15:0]out;
-
+	reg Clear;
+	
 	initial begin
 		
 		InstructionMemory[0]  = 16'b0000_001_010_000000;//mv  R1,R2  | R.E = 2
 		InstructionMemory[1]  = 16'b0001_010_000_000101;//mvi R2,5	 | R.E = 5
 		InstructionMemory[2]  = 16'b0010_010_011_000000;//add R2,R3  | R.E = 8
-		InstructionMemory[3]  = 16'b0000_001_000_000001;//sub
-		InstructionMemory[4]  = 16'b0000_001_000_000001;//and
-		InstructionMemory[5]  = 16'b0000_001_000_000001;//slt
-		InstructionMemory[6]  = 16'b0000_001_000_000001;//sll
-		InstructionMemory[7]  = 16'b0000_001_000_000001;//srl
-		InstructionMemory[8]  = 16'b0000_001_000_000001;//mvnz
-		InstructionMemory[9]  = 16'b0000_001_000_000001;//ld
-		InstructionMemory[10] = 16'b0000_001_000_000001;//sd
+		InstructionMemory[3]  = 16'b0011_100_011_000000;//sub R4,R3  | R.E = 1
+		InstructionMemory[4]  = 16'b0100_001_001_000000;//and R1,R1
+		InstructionMemory[5]  = 16'b0101_000_100_000001;//slt R0,R4  | R.E = 1
+		InstructionMemory[6]  = 16'b0101_111_011_000001;//slt R7,R3  | R.E = 0
+		InstructionMemory[7]  = 16'b1001_000_100_000000;//ld  R0,R4  | R.E = 1 
+		InstructionMemory[8]  = 16'b0001_001_000_000001;//mvi R1,1	 | R.E = 1 
+		InstructionMemory[9]  = 16'b1010_011_001_000000;//sd  R3,R1  | R.E = 1
+		InstructionMemory[10] = 16'b0000_001_000_000001;//
 		InstructionMemory[11] = 16'b0000_001_000_000001;
 		InstructionMemory[12] = 16'b0000_001_000_000001;
 		InstructionMemory[13] = 16'b0000_001_000_000001;
 		InstructionMemory[14] = 16'b0000_001_000_000001;
 		InstructionMemory[15] = 16'b0000_001_000_000001;	
 
-		for(i=0;i<16;i=i+1) begin
+		for(i=0;i<8;i=i+1) begin
 			RegisterBank[i] = i;
 			DataMemory[i] = i;
 		end	
@@ -47,16 +48,23 @@ module processor(DIN, Resetn, Clock, Run, Done);
 		Done = 1'b0;
 		curr_stage = 2'b00;
 	end
-
-	wire Clear = Done | ~Resetn | ~Run ;
-	contador stage(Clear, Clock,curr_stage);
 	
-	always @(posedge Clock or Done) begin
+	
+	//wire Clear = Done | Reset | ~Run ;
+	//contador stage(Clear, Clock,curr_stage);
+	
+	
+	
+	always @(posedge Clock) begin
 			//Adicionar Run
-
+			Clear = Done | Reset | ~Run;
+			
+			curr_stage = curr_stage + 1'b1;
+				
 			if(Done) begin
-				pc = pc + 1'b0;
+				pc = pc + 1'b1;
 				Done = 1'b0;
+				curr_stage = 2'b00;
 				if (pc == 4'b1111) begin
 					pc = 4'b0000;
 				end
@@ -151,12 +159,12 @@ module processor(DIN, Resetn, Clock, Run, Done);
 				case (instructionIndex)
 					4'b0010: //add
 					begin
-						Gtmp = tmpreg + RegisterBank[registerB];
+						Gtmp = tmpreg + RegisterBank[reg_B];
 					end
 
 					4'b0011://sub
 					begin
-						Gtmp = tmpreg - RegisterBank[registerB];
+						Gtmp = tmpreg - RegisterBank[reg_B];
 					end
 
 					4'b1001: //ld
@@ -194,7 +202,7 @@ module processor(DIN, Resetn, Clock, Run, Done);
 			endcase
 	end	
 endmodule
-
+/*
 module contador(Clear, Clock,out);
 	input Clear, Clock;
 	output reg [1:0] out;
@@ -207,8 +215,10 @@ module contador(Clear, Clock,out);
 	end 
 	
 endmodule
+*/
 
-module toplevel(SW,LEDR,HEX0);
 
 
-endmodule
+
+
+
