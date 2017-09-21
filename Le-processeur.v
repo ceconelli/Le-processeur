@@ -1,23 +1,39 @@
-module proc(DIN, Reset, Clock, Run, Done,out);
-	input [15:0] DIN; //dado de entrada
+module display(a,b,c,d,s0,s1,s2,s3,s4,s5,s6);
+
+	input a,b,c,d;
+	output s0,s1,s2,s3,s4,s5,s6;
+	assign s0= !((!a&c) | (a&!d) | (!b&!d) | (b&c) | (a&!b&!c) | (!a&b&d));
+	assign s1= !((!a&!b) | (!b&!c) | (!b&!d) | (!a&c&d) | (!a&!c&!d) | (a&!c&d));
+	assign s2= !((!a&b) | (!c&d) | (a&!b) | (!b&!c) | (!b&d));
+	assign s3= !((a&!c) | (!b&!c&!d) | (b&!c&d) | (a&!b&d) | (!a&!b&c) | (!a&c&!d) | (b&c&!d));
+	assign s4= !((a&b) | (c&!d) | (a&c) | (!b&!d));
+	 
+	assign s5= !((!c&!d) | (a&!b) | (a&c) | (!a&b&!c) | (b&c&!d));
+	 
+	assign s6= !((a&!b) | (c&!d) | (a&c) | (!b&c) | (!a&b&!c) | (b&!c&d));
+
+endmodule
+
+module proc(Clock,Reset,Run,Done,reg_A,reg_B,curr_stage,out);
+
 	input Reset, Clock, Run;
 	output reg Done; //sinal que informa se a instruçao ja terminou
 	
+	output reg [2:0]  reg_A;
+	output reg [2:0]  reg_B;
+	output reg [1:0]  curr_stage; // estagio da instrução
+	output reg [15:0]out;
 	reg [15:0] InstructionMemory [15:0]; //Memória de instruções
 	reg [15:0] RegisterBank [7:0]; // Banco de registradores
 	reg [15:0] DataMemory [7:0]; // Memória de dados
-	reg [3:0]  pc; // index da memória de instruções
-	reg [1:0]  curr_stage; // estagio da instrução
 	reg [15:0] instruction; // instrução 16 bits
 	reg [3:0]  instructionIndex;// índice da instrução a ser executada
-	reg [2:0]  reg_A;
-	reg [2:0]  reg_B;
+	reg [3:0]  pc; // index da memória de instruções
 	reg [5:0]  imediate;
 	reg [15:0] tmpreg;
 	reg [15:0] Gtmp;
-	reg [15:0] memory_data;
+	reg [15:0] memory_data; // registrador temporário, armazena dado que vem da memória de dados
 	integer i;
-	output reg [15:0]out;
 	reg Clear;
 	
 	initial begin
@@ -32,9 +48,9 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 		InstructionMemory[7]  = 16'b1001_000_100_000000;//ld  R0,R4  | R.E = 1 
 		InstructionMemory[8]  = 16'b0001_001_000_000001;//mvi R1,1	 | R.E = 1 
 		InstructionMemory[9]  = 16'b1010_011_001_000000;//sd  R3,R1  | R.E = 1
-		InstructionMemory[10] = 16'b0000_001_000_000001;//
-		InstructionMemory[11] = 16'b0000_001_000_000001;
-		InstructionMemory[12] = 16'b0000_001_000_000001;
+		InstructionMemory[10] = 16'b0000_001_000_000001;//add R6,R0
+		InstructionMemory[11] = 16'b0000_001_000_000001;//add R6,R1
+		InstructionMemory[12] = 16'b0000_001_000_000001;//
 		InstructionMemory[13] = 16'b0000_001_000_000001;
 		InstructionMemory[14] = 16'b0000_001_000_000001;
 		InstructionMemory[15] = 16'b0000_001_000_000001;	
@@ -47,6 +63,8 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 		pc = 4'b0000; 
 		Done = 1'b0;
 		curr_stage = 2'b00;
+		Gtmp = 0;
+		tmpreg = 0;
 	end
 	
 	
@@ -56,8 +74,18 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 	
 	
 	always @(posedge Clock) begin
-			//Adicionar Run
-			Clear = Done | Reset | ~Run;
+		if (Run) begin
+			if (Reset) begin
+				for(i=0;i<8;i=i+1) begin
+					RegisterBank[i] = i;
+					DataMemory[i] = i;
+				end
+				pc = 4'b0000; 
+				Done = 1'b0;
+				curr_stage = 2'b00;
+				Gtmp = 0;
+				tmpreg = 0;
+			end
 			
 			curr_stage = curr_stage + 1'b1;
 				
@@ -73,6 +101,7 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 			case (curr_stage)
 				2'b00: // busca instrução na memória
 				begin
+					//instruction = DIN;
 					instruction = InstructionMemory[pc];
 					instructionIndex = instruction[15:12];
 					reg_A = instruction[11:9];
@@ -140,8 +169,9 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 
 					4'b1000: //mvnz
 					begin
-					//TODO	
-
+						if (Gtmp != 0) begin
+							RegisterBank[reg_A] = RegisterBank[reg_B];
+						end
 					end
 
 					4'b1001: //ld 
@@ -200,25 +230,27 @@ module proc(DIN, Reset, Clock, Run, Done,out);
 					end
 				endcase
 			endcase
+		end
 	end	
 endmodule
-/*
-module contador(Clear, Clock,out);
-	input Clear, Clock;
-	output reg [1:0] out;
-	
-	always @(posedge Clock)begin
-		if (Clear)
-			out <= 2'b00;
-		else
-			out <= out + 1'b1;
-	end 
-	
+
+module toplevel(SW,LEDR,HEX3,HEX2,HEX1);
+
+	input [17:0]SW;
+	input [17:0]LEDR;
+	output [6:0]HEX1;
+	output [6:0]HEX2;
+	output [6:0]HEX3;
+	wire Done;
+	wire [2:0]reg_A;
+	wire [2:0]reg_B;
+	wire [1:0]curr_stage;
+	wire [15:0]out;
+
+
+	proc processor(SW[17],SW[16],SW[15],Done,reg_A,reg_B,curr_stage,out);
+	assign LEDR[0] = Done;
+	display result(out[3],out[2],out[1],out[0],HEX1[0],HEX1[1],HEX1[2],HEX1[3],HEX1[4],HEX1[5],HEX1[6]);
+	display regB(1'b0,reg_B[2],reg_B[1],reg_B[0],HEX2[0],HEX2[1],HEX2[2],HEX2[3],HEX2[4],HEX2[5],HEX2[6]);
+	display regA(1'b0,reg_A[2],reg_A[1],reg_A[0],HEX3[0],HEX3[1],HEX3[2],HEX3[3],HEX3[4],HEX3[5],HEX3[6]);
 endmodule
-*/
-
-
-
-
-
-
